@@ -1,0 +1,195 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Custom Force Layout Visualization</title>
+    <script src="d3.v7.js"></script>
+
+    <style>
+        body {
+            font-family: 'Arial', sans-serif;
+            margin: 0;
+            padding: 0;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            background-color: #ecf0f1;
+        }
+
+        #container {
+            display: flex;
+            align-items: flex-end;
+            position: relative;
+            width: 80%;
+            margin: 0 auto;
+        }
+
+        #visualization {
+            flex: 0 0 80%;
+            margin-right: 10px;
+        }
+
+        #sideContainer {
+            flex: 0 0 20%;
+            display: flex;
+            flex-direction: column;
+            align-items: flex-end;
+        }
+
+        #topContainer,
+        #bottomContainer {
+            background-color: #3498db;
+            padding: 15px;
+            border: 1px solid #2980b9;
+            border-radius: 8px;
+            margin-bottom: 15px;
+            width: 100%;
+            height: 45%;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        }
+
+        #topContainer h2,
+        #bottomContainer h2 {
+            color: #fff;
+            margin-bottom: 10px;
+            font-size: 1.5em;
+        }
+
+        #topContainer p,
+        #bottomContainer p {
+            color: #ecf0f1;
+            line-height: 1.5;
+            font-size: 1.2em;
+        }
+
+        #topContainer button,
+        #bottomContainer button {
+            background-color: #2ecc71;
+            color: white;
+            padding: 12px 18px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 1.2em;
+            transition: background-color 0.3s ease;
+        }
+
+        #topContainer button:hover,
+        #bottomContainer button:hover {
+            background-color: #27ae60;
+        }
+    </style>
+</head>
+<body>
+<div class="container">
+    <h1>MAJOR ASSIGNMENT 3</h1>
+    <h2>By</h2>
+    <h3>Khushi Hareshkumar Dubal</h3>
+</div>
+
+<div id="container">
+    <div id="visualization">
+        <svg id="visualization" viewBox="-200 50 1000 800" style="align-content: center;"></svg>
+    </div>
+    <div id="sideContainer">
+        <div id="topContainer">
+            <h2>Research Network Visualization</h2>
+            <p id="authorName"></p>
+            <p id="authorCountry"></p>
+            <p id="authorTitle"></p>
+            <p id="authorYear"></p>
+        </div>
+        <div id="bottomContainer">
+            <form id="controlForm">
+                <label>Link Strength:</label>
+                <input type="number" id="linkStrength" value="0.1" min="0" step="0.2"><br>
+
+                <label>Collide Force:</label>
+                <input type="number" id="collideForce" value="10" min="0" step="2"><br>
+
+                <label>Charge Force:</label>
+                <input type="number" id="chargeForce" value="-30" step="2"><br>
+
+                <label>Node Size:</label>
+                <input type="radio" name="nodeSize" value="citations" checked> No of Citations
+                <input type="radio" name="nodeSize" value="publications"> No of Publications by authors
+                <input type="radio" name="nodeSize" value="degree"> Degree<br>
+
+                <button type="button" onclick="submitForm()">Apply Changes</button>
+            </form>
+        </div>
+    </div>
+</div>
+<script>
+    const colorScale = d3.scaleOrdinal(d3.schemeCategory10);
+
+    function submitForm() {
+        d3.select("#visualization").selectAll("*").remove();
+        upgrade();
+    }
+
+    function upgrade() {
+        d3.json("authorsdatainfo.json").then(function (data) {
+            const nodes = data.nodes;
+            const edges = data.links;
+
+            const svg = d3.select("#visualization");
+            const width = +svg.attr("viewBox").split(" ")[2];
+            const height = +svg.attr("viewBox").split(" ")[3];
+
+            const simulation = d3.forceSimulation(nodes)
+                .force("link", d3.forceLink(edges).id(d => d.id).strength(parseFloat(document.getElementById("linkStrength").value)))
+                .force("charge", d3.forceManyBody().strength(parseFloat(document.getElementById("chargeForce").value)))
+                .force("collide", d3.forceCollide(parseFloat(document.getElementById("collideForce").value)))
+                .force("center", d3.forceCenter(width / 2, height / 2));
+
+            const link = svg.append("g")
+                .selectAll("line")
+                .data(edges)
+                .enter().append("line")
+                .attr("stroke", "#ccc")
+                .attr("stroke-width", 1.5);
+
+            const node = svg.append("g")
+                .selectAll("circle")
+                .data(nodes)
+                .enter().append("circle")
+                .attr("class", "node")
+                .attr("r", d => Math.sqrt(d.citations) + 5)
+                .attr("fill", d => colorScale(d.country))
+                .on("mouseover", (event, d) => {
+                    node.style("opacity", o => o.country === d.country ? 1 : 0.2);
+                    link.style("opacity", 0.2);
+                })
+                .on("mouseout", () => {
+                    node.style("opacity", 1);
+                    link.style("opacity", 1);
+                })
+                .on("click", (event, d) => {
+                    d3.select("#authorName").text('Names: ' + d.authors);
+                    d3.select("#authorCountry").text('Country: ' + d.country);
+                    d3.select("#authorTitle").text('Title: ' + d.title);
+                    d3.select("#authorYear").text('Year: ' + d.year);
+                });
+
+            simulation.on("tick", () => {
+                link
+                    .attr("x1", d => d.source.x)
+                    .attr("y1", d => d.source.y)
+                    .attr("x2", d => d.target.x)
+                    .attr("y2", d => d.target.y);
+
+                node
+                    .attr("cx", d => d.x)
+                    .attr("cy", d => d.y);
+            });
+        });
+    }
+
+    upgrade();
+</script>
+
+</body>
+</html>
